@@ -46,16 +46,6 @@ for dir in ( download_directory, url_list_directory ):
 
 download_loop_threshold = 10 # The number of times that the main loop will iterate before exiting, regardless of how many urls remain to be downloaded. This is a failsafe designed to catch and kill an infinite loop if there happen to be urls in our url download list which will never sucessfully download. Without this catch, the loop would reattempt to download these files ad infinitum.
 
-# Written by @tzot on Stack Overflow
-def mkdir_p( path ):
-    try:
-        os.makedirs(path)
-    except OSError as exc:  # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
-
 def printIfVerbose( message ):
 	if verbose == True:
 		print( message )
@@ -151,9 +141,9 @@ def checkFilesForCompleteness( params ):
 		try:
 			if md.downloadComplete( url, fp ) == False:
 				os.remove( fp )
-				print( fillLineRemainder( "%s is fragmented. Deleting." % file_name, '-', MAX_OUTPUT_LEN-1 ) )
+				printIfVerbose( fillLineRemainder( "%s is fragmented. Deleting." % file_name, '-', MAX_OUTPUT_LEN-1 ) )
 			else:
-				print( fillLineRemainder( "%s is intact." % file_name, '+', MAX_OUTPUT_LEN-1 ) )
+				printIfVerbose( fillLineRemainder( "%s is intact." % file_name, '+', MAX_OUTPUT_LEN-1 ) )
 				f = open( os.path.join( completeness_reports_directory, file_name ), 'w' )
 				f.close()
 		except IOError:
@@ -170,27 +160,35 @@ def getUncheckedFiles( params ):
 		if not os.path.isfile( report_fp ):
 			not_checked.append( p )
 	return not_checked
-		
+	
+# Placeholder function that just keeps a single process going indefinitely until it's terminated by it's parent.
+# Sort of used as a flag for the completeness check method.
+def sitOnHands():
+	while True:
+		time.sleep( 10 ) # Continuously sleep, waking up every so often just to check if we've been killed.
+	
 # Wrapper for the checkFilesForCompleteness function which spawns a child process to conduct the check while the main process proceeds with the download. Function also returns child process so that the main function can join the child process once the most recent download loop has completed.
 def beginCompletenessCheck( params ):	
-	mkdir_p( completeness_reports_directory )	
+	os.mkdirs( completeness_reports_directory )	
 	params = getUncheckedFiles( params )
-	print( "%s files have not yet been checked." % len( params ) )
+	printIfVerbose( "%s files have not yet been checked." % len( params ) )
 	groups = divideIntoGroups( params, MAX_NUM_PROCS )
 	pool = Pool( MAX_NUM_PROCS )
-	pool.map( checkFilesForCompleteness, groups )	
+	flag_process = proc( target=sitOnHands(), args=() )
+	pool.map( checkFilesForCompleteness, groups )
+	return flag_process
 	
 		
 # Divide list into num_groups equal_sized groups, and return groups as a list of groups.
 def divideIntoGroups( params, num_groups ):
 	param_groups = list()
 	param_group_size = int( len( params ) / MAX_NUM_PROCS )
-	print( param_group_size )
+	printIfVerbose( param_group_size )
 	for i in range( 0, num_groups ):
 		if (i+1)*param_group_size > (len( params ) - 1): # Special case for the last group.
 			new_group = params[i*param_group_size:] # Grabs all remaining items
 		else:
-			print( "%s:%s" % ( i*param_group_size, (i+1)*param_group_size ) )
+			printIfVerbose( "%s:%s" % ( i*param_group_size, (i+1)*param_group_size ) )
 			new_group = params[i*param_group_size:(i+1)*param_group_size]
 		param_groups.append( new_group )
 	return param_groups	
@@ -244,13 +242,13 @@ def main():
 def main_dl_check():
 	urls = getListOfURLSForDownload( url_list_directory )
 	to_dl, dl_check_params = findUndownloadedFiles( urls )
-	print( "%s files to check." % len( dl_check_params ) )
+	printIfVerbose( "%s files to check." % len( dl_check_params ) )
 	
 	beginCompletenessCheck( dl_check_params )
 		
 if __name__ == '__main__':
 	main()
-	print( "Exiting program. \"Thank you for your help!\" -Tristan" )	
+	printIfVerbose( "Exiting program. \"Thank you for your help!\" -Tristan" )	
 			
 			
 		
