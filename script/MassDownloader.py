@@ -27,7 +27,7 @@ dl_att_thshold = 5 # The number of times the script will attempt to download a f
 base_wait_time = 2 # This will be multiplied by a random value between .5 and 1.5 between each download to determine the number of seconds the script will wait. Its an attempt to prevent the server from kicking us off.
 restart_wait_time = 5 # The number of seconds the script will pause when restarting a download
 file_creation_wait_limit = 60 # The number of seconds the script will wait for the file to be created before asumming an error has occurred.
-dl_completion_threshold = 1.0 # The percentage of the file which must be downloaded for the file to be considered 'completely' downloaded. Useful if there is a consistant difference between file size once downloaded, even when download is truly complete.
+dl_completion_threshold = 1.0 # The percentage of the file which must be downloaded for the file to be considered 'completely' downloaded. Useful if there is a consistant difference between file size once downloaded, even when download is truly complete, or when a file can still be used when <100% complete (CSV files, eg.).
 # If set to true, the script will check each file already downloaded for completeness. Can take a long time, because for each file you have to ask the server for the size of the file on their disk, which usually takes a few seconds per request. So for 10,000 files it can take several hours to check
 checkDownloadCompleteness = False
 verbose = True # Set to true for the script to describe its behaviour in real time via the console
@@ -78,6 +78,7 @@ def restartDL( p, f_path, url ):
 def dlFile( url, f_path ):	
 	printIfVerbose(  "Downloading %s" % url )
 	urllib.urlretrieve( url, f_path )
+	urllib.urlcleanup()
 	printIfVerbose(  "Finished.")
 	return True
 
@@ -86,6 +87,8 @@ def getFileSizeOnServer( url ):
 	size = int( d.info()['Content-Length'] )
 	return size
 		
+# Returns true if the file at fp and the file at url are the same size on disk.
+# The percentage of the file that has to be present for it to be considered 'complete' can be altered by changing dl_completion_threshold
 def downloadComplete( url, fp ):
 	size_on_server = getFileSizeOnServer( url )
 	size_on_disk = os.path.getsize( fp )
@@ -96,6 +99,7 @@ def downloadComplete( url, fp ):
 # You can pass a postfix in through post which will be affixed to the end of the filename, before the file extension. Useful if you're downloading multiple files which all have the same output name (AutoGrid, a website we use a lot, does this), and want to distinguish between them 
 def dlFileWithProcChecks( url, f_path, post='' ):
 	try:
+		# Fist we check if the file already exists.
 		if os.path.isfile( f_path ):
 			printIfVerbose(  "%s already present on disk." % f_path )
 			if checkDownloadCompleteness == True:
@@ -172,23 +176,11 @@ def dlFilesFromList( list, dl_dir ):
 		dir, file = os.path.split( url )
 		f_path = os.path.join( dl_dir, file )
 		executed = dlFileWithProcChecks( url, f_path )
-		if executed:	
+		if executed == True:	
 			# Wait a random amount of seconds. I guess some servers will kick you off if you don't wait at all between downloads, and still others will kick you off if you wait exactly the same amount of time between downloads. I've never seen it, but I've read about it and its easy enough to implement.
 			factor = random.random() + .5 # Returns a random decimal value between .5 and 1.5
 			wait_time = base_wait_time * factor
 			printIfVerbose(  "Sleeping for %s seconds..." % wait_time )
-		elif loop_dl_attempts:
-			list.remove( url ) # Remove the url from the list, and...
-			list.append( url ) # Append the url to the back of the list to be retried later
-		
-# Dowloads files from a text file containing urls.		
-def dlFromURLList( dir, links ):
-	if not os.path.isdir( dir ):
-		os.mkdir( dir )
-	file = open( links, 'r' )
-	list = [line.rstrip() for line in file]
-	printIfVerbose(  "Attempting downloads on %s files..." % len( list ) )
-	dlFilesFromList( list, dir )
-	
+			
 if __name__ == '__main__':
 	main()
