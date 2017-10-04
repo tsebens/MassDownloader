@@ -18,6 +18,7 @@ import sys
 import os
 import os.path
 import errno
+import shutil
 # The MassDownloader script should be in the same directory as this wrapper
 cwd = os.getcwd()
 sys.path.append( cwd )
@@ -38,13 +39,21 @@ completeness_reports_directory = os.path.join( cwd, r'reports\completeness' )
 MAX_NUM_PROCS = 25
 MAX_OUTPUT_LEN = 80 # Basically the max width, in characters, of the command line prompt
 
-
-# Make the directories if they don't exist
-for dir in ( download_directory, url_list_directory ):
-	if not os.path.isdir( dir ):
-		os.mkdir( dir )
-
 download_loop_threshold = 10 # The number of times that the main loop will iterate before exiting, regardless of how many urls remain to be downloaded. This is a failsafe designed to catch and kill an infinite loop if there happen to be urls in our url download list which will never sucessfully download. Without this catch, the loop would reattempt to download these files ad infinitum.
+
+def createTree( dir ):
+	elems = dir.split( os.sep )
+	curr_dir = elems[0] + os.sep # os.path.join acts weird if one of the elements is just a drive letter
+	elems = elems[1:] # Clip off the first element since we already have it.
+	for e in elems:
+		curr_dir = os.path.join( curr_dir, e )
+		if not os.path.isdir( curr_dir ):
+			os.mkdir( curr_dir )
+	
+# Make the directories if they don't exist
+for dir in ( download_directory, url_list_directory, completeness_reports_directory ):
+	if not os.path.isdir( dir ):
+		createTree( dir )
 
 def printIfVerbose( message ):
 	if verbose == True:
@@ -179,14 +188,14 @@ def beginCompletenessCheck( params ):
 	return flag_process
 	
 		
-# Divide list into num_groups equal_sized groups, and return groups as a list of groups.
+# Divide list into num_groups equal_sized groups, and return groups as a list of lists.
 def divideIntoGroups( params, num_groups ):
 	param_groups = list()
 	param_group_size = int( len( params ) / MAX_NUM_PROCS )
 	printIfVerbose( param_group_size )
 	for i in range( 0, num_groups ):
-		if (i+1)*param_group_size > (len( params ) - 1): # Special case for the last group.
-			new_group = params[i*param_group_size:] # Grabs all remaining items
+		if (i+1)*param_group_size > (len( params ) - 1): # Special case for the last group. Grabs all remaining items.
+			new_group = params[i*param_group_size:]
 		else:
 			printIfVerbose( "%s:%s" % ( i*param_group_size, (i+1)*param_group_size ) )
 			new_group = params[i*param_group_size:(i+1)*param_group_size]
