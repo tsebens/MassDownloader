@@ -128,7 +128,7 @@ def findUndownloadedFiles( urls ):
 		if not os.path.isfile( fp ):
 			to_dl.append( url )
 		else:
-			dl_check_params.append( ( url, fp ) )
+			dl_check_params.append( { 'url': url, 'fp': fp } )
 	return ( to_dl, dl_check_params )
 	
 # Returns a line consisting of line, followed by as many iterations of char as are needed to reach a total length of l
@@ -144,10 +144,9 @@ def checkFilesForCompleteness( params ):
 # If there are no files to check, return immediatly. It is easier to put this check here rather than in the main download loop. This way, we can simply spawn the process, then join it later without checking to see if we ever actually spawned it in the first place. If we spawn the download check process, and there are no files to check, then when we try to join it we'll just join it immediatly.
 	if len( params ) <= 0:
 		return
-	printIfVerbose( 'Checking %s files...' % len( params ) )
 	for param in params:
-		url = param[0]
-		fp = param[1]
+		url = param['url']
+		fp = param['fp']
 		file_name = os.path.basename( fp )
 		try:
 			if md.downloadComplete( url, fp ) == False:
@@ -164,27 +163,20 @@ def checkFilesForCompleteness( params ):
 def getUncheckedFiles( params ):
 	not_checked = list()
 	for p in params:
-		url = p[0]
-		fp = p[1]
+		url = p['url']
+		fp = p['url']
 		report_fp = os.path.join( completeness_reports_directory, os.path.basename( fp ) )
 		if not os.path.isfile( report_fp ):
 			not_checked.append( p )
 	return not_checked
 	
-# Placeholder function that just keeps a single process going indefinitely until it's terminated by it's parent.
-# Sort of used as a flag for the completeness check method.
-def sitOnHands():
-	while True:
-		time.sleep( 10 ) # Continuously sleep, waking up every so often just to check if we've been killed.
-	
 # Wrapper for the checkFilesForCompleteness function which spawns a child process to conduct the check while the main process proceeds with the download. Function also returns child process so that the main function can join the child process once the most recent download loop has completed.
 def beginCompletenessCheck( params ):	
-	params = getUncheckedFiles( params )
+	params = getUncheckedFiles( params ) # Determine which of the downloaded files has already been checked for completeness, and therefore doesn't need to be checked again
 	printIfVerbose( "%s files have not yet been checked." % len( params ) )
 	groups = divideIntoGroups( params, MAX_NUM_PROCS )
 	pool = Pool( MAX_NUM_PROCS )
 	pool.map( checkFilesForCompleteness, groups )
-	
 		
 # Divide list into num_groups equal_sized groups, and return groups as a list of lists.
 def divideIntoGroups( params, num_groups ):
