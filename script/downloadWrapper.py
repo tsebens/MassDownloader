@@ -91,19 +91,20 @@ def getListOfURLSForDownload( dir ):
 	sanitized = sanitizeURLList( urls )
 	return sanitized
 
+# An attempt to pull out only those URLS which are viable download urls.
+# TODO The regexes aren't actually being used. They're just placeholders.
 def sanitizeURLList( urls ):
 	pattern = ".*download=.*"
-	regex = re.compile( pattern )	
+	regex1 = re.compile( pattern )	
+	# A viable download URL will not have whitespaces. Right?
 	sanitized = list()
 	for url in urls:
-		if regex.match( url ):
+		if regex1.match( url ):
 			pass
 		else:
 			sanitized.append( url )
 	return sanitized
 		
-		
-	
 # Function which can take in a list of either filepaths, or urls, and return just the names of the files they refer to, with no file directory path attached.
 def getFileNames( list ):
 	ret = [os.path.basename( l ) for l in list]
@@ -143,6 +144,7 @@ def checkFilesForCompleteness( params ):
 # If there are no files to check, return immediatly. It is easier to put this check here rather than in the main download loop. This way, we can simply spawn the process, then join it later without checking to see if we ever actually spawned it in the first place. If we spawn the download check process, and there are no files to check, then when we try to join it we'll just join it immediatly.
 	if len( params ) <= 0:
 		return
+	printIfVerbose( 'Checking %s files...' % len( params ) )
 	for param in params:
 		url = param[0]
 		fp = param[1]
@@ -157,7 +159,6 @@ def checkFilesForCompleteness( params ):
 				f.close()
 		except IOError:
 			continue
-		
 		
 # Accepts a list of parameters for file download completeness checks, and only returns those paramaters who do not have a corresponding file in the completeness_reports_directory. A file present in this directory would indicate that the file has already been checked for completeness and is fully intact.
 def getUncheckedFiles( params ):
@@ -178,26 +179,21 @@ def sitOnHands():
 	
 # Wrapper for the checkFilesForCompleteness function which spawns a child process to conduct the check while the main process proceeds with the download. Function also returns child process so that the main function can join the child process once the most recent download loop has completed.
 def beginCompletenessCheck( params ):	
-	os.mkdirs( completeness_reports_directory )	
 	params = getUncheckedFiles( params )
 	printIfVerbose( "%s files have not yet been checked." % len( params ) )
 	groups = divideIntoGroups( params, MAX_NUM_PROCS )
 	pool = Pool( MAX_NUM_PROCS )
-	flag_process = proc( target=sitOnHands(), args=() )
 	pool.map( checkFilesForCompleteness, groups )
-	return flag_process
 	
 		
 # Divide list into num_groups equal_sized groups, and return groups as a list of lists.
 def divideIntoGroups( params, num_groups ):
 	param_groups = list()
 	param_group_size = int( len( params ) / MAX_NUM_PROCS )
-	printIfVerbose( param_group_size )
 	for i in range( 0, num_groups ):
-		if (i+1)*param_group_size > (len( params ) - 1): # Special case for the last group. Grabs all remaining items.
+		if (i+1)*param_group_size > (len( params ) - 1): # Special case for the last group. Grabs all remaining items
 			new_group = params[i*param_group_size:]
 		else:
-			printIfVerbose( "%s:%s" % ( i*param_group_size, (i+1)*param_group_size ) )
 			new_group = params[i*param_group_size:(i+1)*param_group_size]
 		param_groups.append( new_group )
 	return param_groups	
@@ -256,7 +252,7 @@ def main_dl_check():
 	beginCompletenessCheck( dl_check_params )
 		
 if __name__ == '__main__':
-	main()
+	main_dl_check()
 	printIfVerbose( "Exiting program. \"Thank you for your help!\" -Tristan" )	
 			
 			

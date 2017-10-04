@@ -13,7 +13,6 @@ Phone No: +1-(907)-500-5430
 # Mass downloader
 import sys
 sys.path.append( r"N:\Python Scripts\BathymetryProcessor" )
-from Display import DisplayManager as DM
 import urllib
 import random
 import os.path
@@ -85,6 +84,7 @@ def dlFile( url, f_path ):
 def getFileSizeOnServer( url ):
 	d = urllib.urlopen( url )
 	size = int( d.info()['Content-Length'] )
+	urllib.urlcleanup()
 	return size
 		
 # Returns true if the file at fp and the file at url are the same size on disk.
