@@ -1,1 +1,1 @@
-python H:\MassDownloader\script\downloadWrapper.py
+python downloadWrapper.py
