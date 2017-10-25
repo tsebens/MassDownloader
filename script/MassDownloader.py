@@ -23,6 +23,7 @@ import traceback
 
 proc_check_time = 10 # The number of seconds the main process will wait between file size checks (which are done to determine download stream activity)
 dl_att_thshold = 5 # The number of times the script will attempt to download a file before abandoning it. Set to -1 for infinite attempts.
+max_dead_cycles = 4 # The number of cycles the script will wait for the download stream to restart once it has died.
 base_wait_time = 2 # This will be multiplied by a random value between .5 and 1.5 between each download to determine the number of seconds the script will wait. Its an attempt to prevent the server from kicking us off.
 restart_wait_time = 5 # The number of seconds the script will pause when restarting a download
 file_creation_wait_limit = 60 # The number of seconds the script will wait for the file to be created before asumming an error has occurred.
@@ -117,9 +118,11 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 		
 		file_size = 0 # We initialize the recorded size of the file to 0 bytes.
 		num_att = 1 # Intitialize the number of attempts at downloading the file we have made.
+		dead_cycles = 0 # Initialize the variable for how many cycles the link has been dead for.
 		
 		while p.is_alive():
 			p.join( proc_check_time )
+			
 			# During the first iteration of this loop, if the proc_check_time is short enough, execution may reach this line before the subprocess has managed to create the file. To allow for this, we simply wait until the file is created. 
 			wait_for_file_creation_count = 0
 			while not os.path.exists( f_path ):
@@ -135,23 +138,28 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 				printIfVerbose( "Checking download stream health..." )
 				# Get the current size of the file in bytes
 				curr_size = os.path.getsize( f_path )
-				printIfVerbose( "Previous size: %s - Current size: %s" % ( file_size, curr_size ) )
+				growth = curr_size - file_size
+				printIfVerbose( "Prv size: %s - Curr size: %s - DL Rate: %s B/s" % ( file_size, curr_size, float( growth / proc_check_time ) ) )
 				if curr_size > file_size:
 					printIfVerbose( "Download stream seems healthy." )
 					file_size = curr_size
+					dead_cycles = 0
 				elif curr_size <= file_size:
-					# If the file size has not changed since the last check, the stream is likely dead. 
-					# We will kill the download and restart it. Hopefully this will solve the problem
-					printIfVerbose( "Download stream seems dead. Restart attempt #%s" % num_att )
-					num_att += 1 # Keep track of the number of times we've tried to download this file
-					# If we have already tried to restart this download the maximum number of times allowed, log the error and move on.
-					if num_att > dl_att_thshold:
-						p.terminate()
-						p.join()
-						os.remove( f_path )
-						raise DownloadStreamDeadException( "Download stream for %s died and could not be restarted." % url )
-					p = restartDL( p, f_path, url )
-					file_size = 0
+					printIfVerbose( "Download stream not looking so healthy." )
+					dead_cycles += 1
+					if dead_cycles > max_dead_cycles:
+						# If the file size has not changed for max_dead_cycles cycles, the stream is likely dead. 
+						# We will kill the download and restart it. Hopefully this will solve the problem
+						printIfVerbose( "Download stream seems dead. Restart attempt #%s" % num_att )
+						num_att += 1 # Keep track of the number of times we've tried to download this file
+						# If we have already tried to restart this download the maximum number of times allowed, log the error and move on.
+						if num_att > dl_att_thshold:
+							p.terminate()
+							p.join()
+							os.remove( f_path )
+							raise DownloadStreamDeadException( "Download stream for %s died and could not be restarted." % url )
+						p = restartDL( p, f_path, url )
+						file_size = 0
 
 	except Exception as e:
 		printIfVerbose(  "Error encountered while downloading %s. Logging event and skipping file." % getNameFromURL( url ) )

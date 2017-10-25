@@ -32,6 +32,8 @@ import re
 
 verbose = True # Set to true if you want the script to decribe its behaviour via the console.
 
+check_files_silently = True # If set to true, all file checks will not print to screen
+
 download_directory = os.path.join( cwd, 'downloads') # The location on disk where all downloaded files will be saved to
 url_list_directory = os.path.join( cwd, 'urls' ) # The location on disk where all text files containing urls to download will be contained.
 completeness_reports_directory = os.path.join( cwd, r'reports\completeness' )
@@ -151,9 +153,11 @@ def checkFilesForCompleteness( params ):
 		try:
 			if md.downloadComplete( url, fp ) == False:
 				os.remove( fp )
-				printIfVerbose( fillLineRemainder( "%s is fragmented. Deleting." % file_name, '-', MAX_OUTPUT_LEN-1 ) )
+				if check_files_silently != True: # Hacky. Not a fan of using a global variable for this. Figure out a change.
+					printIfVerbose( fillLineRemainder( "%s is fragmented. Deleting." % file_name, '-', MAX_OUTPUT_LEN-1 ) )
 			else:
-				printIfVerbose( fillLineRemainder( "%s is intact." % file_name, '+', MAX_OUTPUT_LEN-1 ) )
+				if check_files_silently != True:
+					printIfVerbose( fillLineRemainder( "%s is intact." % file_name, '+', MAX_OUTPUT_LEN-1 ) )
 				f = open( os.path.join( completeness_reports_directory, file_name ), 'w' )
 				f.close()
 		except IOError:
@@ -177,6 +181,7 @@ def beginCompletenessCheck( params ):
 	groups = divideIntoGroups( params, MAX_NUM_PROCS )
 	pool = Pool( MAX_NUM_PROCS )
 	pool.map( checkFilesForCompleteness, groups )
+	print( 'Completeness check begun.' )
 		
 # Divide list into num_groups equal_sized groups, and return groups as a list of lists.
 def divideIntoGroups( params, num_groups ):
@@ -206,7 +211,7 @@ def main():
 		
 		to_dl, dl_check_params = findUndownloadedFiles( urls )
 		
-		beginCompletenessCheck( dl_check_params )
+		# beginCompletenessCheck( dl_check_params )
 		# If all files for which we have a download urls have corresponding files in our download directory, we may be done. First we need to check to see if the 
 		if len( to_dl ) == 0:
 			printIfVerbose( "All files already downloaded." )
@@ -237,6 +242,7 @@ def main():
 		printIfVerbose( "All queued downloads finished. Checking for additional downloads...")
 		
 def main_dl_check():
+	check_files_silently = False
 	urls = getListOfURLSForDownload( url_list_directory )
 	to_dl, dl_check_params = findUndownloadedFiles( urls )
 	printIfVerbose( "%s files to check." % len( dl_check_params ) )
@@ -244,12 +250,5 @@ def main_dl_check():
 	beginCompletenessCheck( dl_check_params )
 		
 if __name__ == '__main__':
-	main_dl_check()
+	main()
 	printIfVerbose( "Exiting program. \"Thank you for your help!\" -Tristan" )	
-			
-			
-		
-		
-	
-	
-	
