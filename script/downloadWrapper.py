@@ -151,7 +151,7 @@ def exportUndownloadedURLList(fp):
     urls = getListOfURLSForDownload(url_list_directory)
     to_dl = findUndownloadedFiles(urls)[0]
     with open(fp, 'w') as file:
-        file.writelines(to_dl)
+        file.writelines(["%s\n" % l for l in to_dl])
 
 
 # Returns a line consisting of line, followed by as many iterations of char as are needed to reach a total length of l
