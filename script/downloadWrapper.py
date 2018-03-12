@@ -146,7 +146,7 @@ def findUndownloadedFiles(urls):
 
 
 def exportUndownloadedURLList(fp):
-    if os.isfile(fp):
+    if os.path.isfile(fp):
         raise FileAlreadyExistsException('Error occurred while exporting undownloaded URL list:\n%s already exists' % fp)
     urls = getListOfURLSForDownload(url_list_directory)
     to_dl = findUndownloadedFiles(urls)[0]
@@ -187,7 +187,9 @@ def checkFilesForCompleteness(params):
             continue
 
 
-# Accepts a list of parameters for file download completeness checks, and only returns those paramaters who do not have a corresponding file in the completeness_reports_directory. A file present in this directory would indicate that the file has already been checked for completeness and is fully intact.
+# Accepts a list of parameters for file download completeness checks, and only returns those paramaters who do not have
+# a corresponding file in the completeness_reports_directory. A file present in this directory would indicate that the
+# file has already been checked for completeness and is fully intact.
 def getUncheckedFiles(params):
     not_checked = list()
     for p in params:
@@ -199,10 +201,13 @@ def getUncheckedFiles(params):
     return not_checked
 
 
-# Wrapper for the checkFilesForCompleteness function which spawns a child process to conduct the check while the main process proceeds with the download. Function also returns child process so that the main function can join the child process once the most recent download loop has completed.
+# Wrapper for the checkFilesForCompleteness function which spawns a child process to conduct the check while the main
+# process proceeds with the download. Function also returns child process so that the main function can join the child
+# process once the most recent download loop has completed.
 def beginCompletenessCheck(params):
     params = getUncheckedFiles(
-        params)  # Determine which of the downloaded files has already been checked for completeness, and therefore doesn't need to be checked again
+        params)  # Determine which of the downloaded files has already been checked for completeness, and therefore
+                 # doesn't need to be checked again
     printIfVerbose("%s files have not yet been checked." % len(params))
     groups = divideIntoGroups(params, MAX_NUM_PROCS)
     pool = Pool(MAX_NUM_PROCS)
@@ -225,7 +230,8 @@ def divideIntoGroups(params, num_groups):
 
 def main():
     loop_count = 0
-    all_files_downloaded = False  # Variable used to ensure that all files are downloaded before the process exits, including lists of urls added after the process began
+    all_files_downloaded = False  # Variable used to ensure that all files are downloaded before the process exits,
+                                  # including lists of urls added after the process began
     while all_files_downloaded == False:
         loop_count += 1
         # Refresh the url list
@@ -240,26 +246,34 @@ def main():
         to_dl, dl_check_params = findUndownloadedFiles(urls)
 
         # beginCompletenessCheck( dl_check_params )
-        # If all files for which we have a download urls have corresponding files in our download directory, we may be done. First we need to check to see if the
+        # If all files for which we have a download urls have corresponding files in our download directory, we may be
+        # done. First we need to check to see if the
         if len(to_dl) == 0:
             printIfVerbose("All files already downloaded.")
             printIfVerbose("Waiting for download check to finish...")
             p.join()
             # Once the download check has finished, we recompile the lists to see if anything has changed.
             to_dl, dl_check_params = findUndownloadedFiles(urls)
-            # If the number of files to download is still 0, that means that the download check process removed no files, indicating that all downloaded files are complete.
+            # If the number of files to download is still 0, that means that the download check process removed no
+            # files, indicating that all downloaded files are complete.
             if len(to_dl) == 0:
                 all_files_downloaded = True
-            # If there are still files to download, then we simply let the download loop run for another cycle. Any files deleted by the download check process well be redownloaded on the next go around.
+            # If there are still files to download, then we simply let the download loop run for another cycle. Any
+            # files deleted by the download check process well be redownloaded on the next go around.
             continue
             assert False
 
         # If execution reaches this point, then there are in fact urls which need downloading still.
         printIfVerbose("%s urls do not have corresponding files on disk. Beginning downloads..." % len(to_dl))
         if loop_count >= download_loop_threshold:
-            # If we have tried to download these urls as many times as the download_loop_threshold allows, what it most likely means is that there is a group of urls which the server simply refuses to let us download. Every time we try, eventually the MassDownloader script gives up, logs the error and moves on. Since they never get their corresponding files added download directory, they're flagged for download every time.
+            # If we have tried to download these urls as many times as the download_loop_threshold allows, what it most
+            # likely means is that there is a group of urls which the server simply refuses to let us download. Every
+            # time we try, eventually the MassDownloader script gives up, logs the error and moves on. Since they never
+            # get their corresponding files added download directory, they're flagged for download every time.
             # We'll make a list of the urls which we were unable to download, and exit the process.
-            # There is a chance that this could be erroneously triggered by the late adding of urls to the url directory, at a time when the program has already executed many times. I find this to be a fairly unlikely possiblity however.
+            # There is a chance that this could be erroneously triggered by the late adding of urls to the url
+            # directory, at a time when the program has already executed many times. I find this to be a fairly unlikely
+            # possiblity however.
             message = "Number of download loop attempts exceeded."
             tb = "No traceback stack"
             logError(message, tb)
