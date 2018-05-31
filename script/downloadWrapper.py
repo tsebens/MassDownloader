@@ -30,10 +30,12 @@ verbose = True  # Set to true if you want the script to decribe its behaviour vi
 
 check_files_silently = True  # If set to true, no file checks will print to screen
 
-download_directory = os.path.join(cwd,
-                                  'downloads')  # os.path.join( cwd, 'downloads') # The location on disk where all downloaded files will be saved to
-url_list_directory = os.path.join(cwd,
-                                  'urls')  # The location on disk where all text files containing urls to download will be contained.
+# os.path.join( cwd, 'downloads') # The location on disk where all downloaded files will be saved to
+DOWNLOAD_DIRECTORY = os.path.join(cwd, 'downloads')
+# The location on disk where all extracted files will be saved to.
+EXTRACT_DIRECTORY = os.path.join(cwd, 'downloads/extracted')
+# The location on disk where all text files containing urls to download will be contained.
+url_list_directory = os.path.join(cwd, 'urls')
 completeness_reports_directory = os.path.join(cwd, r'reports\completeness')
 
 MAX_NUM_PROCS = 25
@@ -55,7 +57,7 @@ def createTree(dir):
 
 
 # Make the directories if they don't exist
-for dir in (download_directory, url_list_directory, completeness_reports_directory):
+for dir in (DOWNLOAD_DIRECTORY, url_list_directory, completeness_reports_directory):
     if not os.path.isdir(dir):
         createTree(dir)
 
@@ -74,7 +76,7 @@ def logError(message, tb):
 
     datestamp = time.strftime("%d/%m/%Y")
 
-    wrapper_error_log_fp = os.path.join(download_directory, 'wrapper_err_log.txt')
+    wrapper_error_log_fp = os.path.join(DOWNLOAD_DIRECTORY, 'wrapper_err_log.txt')
     with open(wrapper_error_log_fp, 'a') as err_log:
         err_log.write("Error encountered at %s on %s\n---------------------------\n" % (timestamp, datestamp))
         err_log.write(message + '\n')
@@ -117,9 +119,17 @@ def sanitizeURLList(urls):
 
 
 # Function which can take in a list of either filepaths, or urls, and return just the names of the files they refer to, with no file directory path attached.
-def getFileNames(list):
+def getFileNames(list, ext):
     ret = [os.path.basename(l) for l in list]
     return ret
+
+
+def getBareName(fp):
+    return os.path.splitext(os.path.basename(fp))[0]
+
+
+def getBareNames(fps):
+    return [getBareName(fp) for fp in fps]
 
 
 # Given the download directory where the files will be saved, compile a list of all file names (no file paths) which are present in the directory
@@ -135,13 +145,20 @@ def getListOfDownloadedFiles(dir):
 def findUndownloadedFiles(urls):
     to_dl = list()
     dl_check_params = list()
+    # In order to simplify the checking process, we will just use the filenames. No directory paths or extensions.
+    dl_file_names = getBareNames(os.listdir(DOWNLOAD_DIRECTORY))
+    extr_file_names = getBareNames(os.listdir(EXTRACT_DIRECTORY))
+    name_hash = [{name:'1'} for name in [collection for collection in (dl_file_names, extr_file_names)]]
     for url in urls:
-        name = os.path.basename(url)
-        fp = os.path.join(download_directory, name)
-        if not os.path.isfile(fp):
+        name = getBareName(url)
+        try:
+            name_hash[name]
+            # If no error is thrown, then the file is present on disk. Add it to the list of files to be checked.
+            dl_check_params.append({'url': url, 'fp': os.path.join(DOWNLOAD_DIRECTORY, os.path.basename(url))})
+        except KeyError:
             to_dl.append(url)
-        else:
-            dl_check_params.append({'url': url, 'fp': fp})
+            #  A key error indicated that the passed name is not in the
+
     return (to_dl, dl_check_params)
 
 
@@ -238,7 +255,7 @@ def main():
         urls = getListOfURLSForDownload(url_list_directory)
         printIfVerbose("Found %s urls for download." % len(urls))
         # Refresh the list of downloaded files
-        files = getListOfDownloadedFiles(download_directory)
+        files = getListOfDownloadedFiles(DOWNLOAD_DIRECTORY)
         printIfVerbose("Found %s file already present on disk." % len(files))
         # Using these lists, compile a list of urls which do not have corresponding files in the download directory
         printIfVerbose("Comparing urls to downloaded files.")
@@ -280,7 +297,7 @@ def main():
             sys.exit()
 
         # If we haven't tripped any of the above conditions, then we must be ready to proceed. Here's where the magic happens...
-        md.dlFilesFromList(to_dl, download_directory)
+        md.dlFilesFromList(to_dl, DOWNLOAD_DIRECTORY)
         printIfVerbose("All queued downloads finished. Checking for additional downloads...")
 
 
