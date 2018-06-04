@@ -119,7 +119,7 @@ def sanitizeURLList(urls):
 
 
 # Function which can take in a list of either filepaths, or urls, and return just the names of the files they refer to, with no file directory path attached.
-def getFileNames(list, ext):
+def getFileNames(list):
     ret = [os.path.basename(l) for l in list]
     return ret
 
