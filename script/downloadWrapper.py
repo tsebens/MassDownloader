@@ -147,7 +147,9 @@ def findUndownloadedFiles(urls):
     dl_check_params = list()
     # In order to simplify the checking process, we will just use the filenames. No directory paths or extensions.
     dl_file_names = getBareNames(os.listdir(DOWNLOAD_DIRECTORY))
-    name_hash = [{name:'1'} for name in dl_file_names]
+    name_hash = {}
+    for name in dl_file_names:
+        name_hash[name] = 1
     for url in urls:
         name = getBareName(url)
         try:
@@ -157,8 +159,7 @@ def findUndownloadedFiles(urls):
         except KeyError:
             to_dl.append(url)
             #  A key error indicated that the passed name is not in the
-
-    return (to_dl, dl_check_params)
+    return (set(to_dl), dl_check_params) # We use sets to account for potential duplicates.
 
 
 def exportUndownloadedURLList(fp):
@@ -267,7 +268,6 @@ def main():
         if len(to_dl) == 0:
             printIfVerbose("All files already downloaded.")
             printIfVerbose("Waiting for download check to finish...")
-            p.join()
             # Once the download check has finished, we recompile the lists to see if anything has changed.
             to_dl, dl_check_params = findUndownloadedFiles(urls)
             # If the number of files to download is still 0, that means that the download check process removed no
