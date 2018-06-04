@@ -195,6 +195,4 @@ def dlFilesFromList( list, dl_dir ):
 				printIfVerbose(  "Sleeping for %s seconds..." % wait_time )
 	except KeyboardInterrupt:
 		kill_flag = True
-			
-if __name__ == '__main__':
-	main()
+
