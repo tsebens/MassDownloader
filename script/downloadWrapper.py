@@ -119,7 +119,7 @@ def sanitizeURLList(urls):
 
 
 # Function which can take in a list of either filepaths, or urls, and return just the names of the files they refer to, with no file directory path attached.
-def getFileNames(list, ext):
+def getFileNames(list):
     ret = [os.path.basename(l) for l in list]
     return ret
 
@@ -148,7 +148,9 @@ def findUndownloadedFiles(urls):
     # In order to simplify the checking process, we will just use the filenames. No directory paths or extensions.
     dl_file_names = getBareNames(os.listdir(DOWNLOAD_DIRECTORY))
     extr_file_names = getBareNames(os.listdir(EXTRACT_DIRECTORY))
-    name_hash = [{name:'1'} for name in [collection for collection in (dl_file_names, extr_file_names)]]
+    name_hash = {}
+    for name in dl_file_names + extr_file_names:
+        name_hash[name] = 1
     for url in urls:
         name = getBareName(url)
         try:
@@ -158,8 +160,8 @@ def findUndownloadedFiles(urls):
         except KeyError:
             to_dl.append(url)
             #  A key error indicated that the passed name is not in the
-
-    return (to_dl, dl_check_params)
+    print('%s urls checked against %s downloaded files. %s urls written to for download.' % (len(urls), len(dl_file_names + extr_file_names), len(to_dl)))
+    return (set(to_dl), dl_check_params) # We use sets to account for potential duplicates.
 
 
 def exportUndownloadedURLList(fp):
