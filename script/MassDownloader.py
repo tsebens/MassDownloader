@@ -180,15 +180,21 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 # list = list of url strings to download
 # dl_dir = the direcectory into which the files will be downloaded
 def dlFilesFromList( list, dl_dir ):
-	for url in list:
-		dir, file = os.path.split( url )
-		f_path = os.path.join( dl_dir, file )
-		executed = dlFileWithProcChecks( url, f_path )
-		if executed == True:	
-			# Wait a random amount of seconds. I guess some servers will kick you off if you don't wait at all between downloads, and still others will kick you off if you wait exactly the same amount of time between downloads. I've never seen it, but I've read about it and its easy enough to implement.
-			factor = random.random() + .5 # Returns a random decimal value between .5 and 1.5
-			wait_time = base_wait_time * factor
-			printIfVerbose(  "Sleeping for %s seconds..." % wait_time )
+	kill_flag = False
+	try:
+		for url in list:
+			dir, file = os.path.split( url )
+			f_path = os.path.join( dl_dir, file )
+			executed = dlFileWithProcChecks( url, f_path )
+			if kill_flag:
+				sys.exit()
+			if executed == True:
+				# Wait a random amount of seconds. I guess some servers will kick you off if you don't wait at all between downloads, and still others will kick you off if you wait exactly the same amount of time between downloads. I've never seen it, but I've read about it and its easy enough to implement.
+				factor = random.random() + .5 # Returns a random decimal value between .5 and 1.5
+				wait_time = base_wait_time * factor
+				printIfVerbose(  "Sleeping for %s seconds..." % wait_time )
+	except KeyboardInterrupt:
+		kill_flag = True
 			
 if __name__ == '__main__':
 	main()
