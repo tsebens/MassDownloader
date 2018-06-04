@@ -147,10 +147,7 @@ def findUndownloadedFiles(urls):
     dl_check_params = list()
     # In order to simplify the checking process, we will just use the filenames. No directory paths or extensions.
     dl_file_names = getBareNames(os.listdir(DOWNLOAD_DIRECTORY))
-    extr_file_names = getBareNames(os.listdir(EXTRACT_DIRECTORY))
-    name_hash = {}
-    for name in dl_file_names + extr_file_names:
-        name_hash[name] = 1
+    name_hash = [{name: 1} for name in dl_file_names]
     for url in urls:
         name = getBareName(url)
         try:
