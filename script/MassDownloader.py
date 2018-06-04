@@ -189,6 +189,3 @@ def dlFilesFromList( list, dl_dir ):
 			factor = random.random() + .5 # Returns a random decimal value between .5 and 1.5
 			wait_time = base_wait_time * factor
 			printIfVerbose(  "Sleeping for %s seconds..." % wait_time )
-			
-if __name__ == '__main__':
-	main()
