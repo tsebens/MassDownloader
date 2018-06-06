@@ -1,0 +1,17 @@
+Plan for improvement:
+
+1.Modularize functionality.
+	a. Functions should complete a single aspect of the download
+		1. Downloading a single file with processing checks
+		2. Checking a single file for download completeness
+		3. Processing multiple files in parallel
+	b. Modularization will enable easy transition to a command line argument based script.
+2. Command line arguments.
+	a. Implement command line functionality.
+	b. Script should be able to accept flags and inputs from the command line to specify behaviour.
+3. Server profiles
+	a. Different servers have different tolerances.
+	b. Script should be able to recognize when a server is forcibly closing it's connections and respond appropriately.
+	c. User should be able to specify the maximum number of parallel downloads they want, and then the script will determine what the server's maximum is
+	d. The script should test the server's capability by gradually increasing the number of downloads (up to the maximum) until the connections are forcibly closed, and then backing them off.
+	e. The script should record the tolerances of each server it encounters, and use that knowledge to adjust it's behaviour appropriately.
