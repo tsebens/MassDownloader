@@ -12,13 +12,15 @@ Phone No: +1-(907)-500-5430
 
 # Mass downloader
 import sys
+
+from script.Agent import dlFile
+
 sys.path.append( r"N:\Python Scripts\BathymetryProcessor" )
 import urllib
 import random
 import os.path
 import time
 from multiprocessing import Process as proc
-import datetime
 import traceback
 
 proc_check_time = 10 # The number of seconds the main process will wait between file size checks (which are done to determine download stream activity)
@@ -70,17 +72,11 @@ def restartDL( p, f_path, url ):
 	p.terminate()
 	time.sleep( restart_wait_time )
 	os.remove( f_path ) # Delete the old file so that the new one doesn't hit it
-	p = proc( target=dlFile, args=( url, f_path ) )
+	p = proc(target=dlFile, args=(url, f_path))
 	p.start()
 	return p
 
 # The basic download function
-def dlFile( url, f_path ):	
-	printIfVerbose(  "Downloading %s" % url )
-	urllib.urlretrieve( url, f_path )
-	urllib.urlcleanup()
-	printIfVerbose(  "Finished.")
-	return True
 
 def getFileSizeOnServer( url ):
 	d = urllib.urlopen( url )
@@ -93,7 +89,7 @@ def getFileSizeOnServer( url ):
 def downloadComplete( url, fp ):
 	size_on_server = getFileSizeOnServer( url )
 	size_on_disk = os.path.getsize( fp )
-	if size_on_disk / size_on_server >= dl_completion_threshold:
+	if size_on_disk >= size_on_server:
 		return True
 	return False
 	
@@ -113,7 +109,7 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 				return True
 		
 		# Start the file download as a child process who's progress we can check on to determine the health of the stream
-		p = proc( target=dlFile, args=( url, f_path ) )
+		p = proc(target=dlFile, args=(url, f_path))
 		p.start()
 		
 		file_size = 0 # We initialize the recorded size of the file to 0 bytes.
