@@ -93,7 +93,7 @@ def getFileSizeOnServer( url ):
 def downloadComplete( url, fp ):
 	size_on_server = getFileSizeOnServer( url )
 	size_on_disk = os.path.getsize( fp )
-	if size_on_disk / size_on_server >= dl_completion_threshold:
+	if size_on_disk >= size_on_server:
 		return True
 	return False
 	
@@ -117,6 +117,7 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 		p.start()
 		
 		file_size = 0 # We initialize the recorded size of the file to 0 bytes.
+		server_size = getFileSizeOnServer(url)
 		num_att = 1 # Intitialize the number of attempts at downloading the file we have made.
 		dead_cycles = 0 # Initialize the variable for how many cycles the link has been dead for.
 		
@@ -139,7 +140,7 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 				# Get the current size of the file in bytes
 				curr_size = os.path.getsize( f_path )
 				growth = curr_size - file_size
-				printIfVerbose( "Prv size: %s - Curr size: %s - DL Rate: %s B/s" % ( file_size, curr_size, float( growth / proc_check_time ) ) )
+				printIfVerbose( "Prv size: %s - Curr size: %s/%s - DL Rate: %s B/s" % ( file_size, curr_size, server_size, float( growth / proc_check_time ) ) )
 				if curr_size > file_size:
 					printIfVerbose( "Download stream seems healthy." )
 					file_size = curr_size
