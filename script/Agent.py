@@ -100,10 +100,11 @@ class Agent:
         raise MethodUnimplementedException('Agent.dissolve has not yet been implemented.')
 
 
-class AgentFactory()
+class AgentFactory():
+    pass
 
 class CaseOfficer:
     """Class for managing multiple Agent instances. Spawns them as necessary, stops them if asked, and checks on their progress."""
     def __init__(self, args: List):
         self.Agents = []
-        self.AgentFactory = af
+        self.AgentFactory = None
