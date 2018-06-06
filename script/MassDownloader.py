@@ -13,7 +13,7 @@ Phone No: +1-(907)-500-5430
 # Mass downloader
 import sys
 
-from script.Agent import dlFile
+from script.obj import dlFile
 
 sys.path.append( r"N:\Python Scripts\BathymetryProcessor" )
 import urllib
