@@ -92,7 +92,8 @@ def downloadComplete( url, fp ):
 	if size_on_disk >= size_on_server:
 		return True
 	return False
-	
+
+
 # You can pass a postfix in through post which will be affixed to the end of the filename, before the file extension. Useful if you're downloading multiple files which all have the same output name (AutoGrid, a website we use a lot, does this), and want to distinguish between them 
 def dlFileWithProcChecks( url, f_path, post='' ):
 	try:
@@ -113,6 +114,7 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 		p.start()
 		
 		file_size = 0 # We initialize the recorded size of the file to 0 bytes.
+		server_size = getFileSizeOnServer(url)
 		num_att = 1 # Intitialize the number of attempts at downloading the file we have made.
 		dead_cycles = 0 # Initialize the variable for how many cycles the link has been dead for.
 		
@@ -135,7 +137,7 @@ def dlFileWithProcChecks( url, f_path, post='' ):
 				# Get the current size of the file in bytes
 				curr_size = os.path.getsize( f_path )
 				growth = curr_size - file_size
-				printIfVerbose( "Prv size: %s - Curr size: %s - DL Rate: %s B/s" % ( file_size, curr_size, float( growth / proc_check_time ) ) )
+				printIfVerbose( "Prv size: %s - Curr size: %s/%s - DL Rate: %s B/s" % ( file_size, curr_size, server_size, float( growth / proc_check_time ) ) )
 				if curr_size > file_size:
 					printIfVerbose( "Download stream seems healthy." )
 					file_size = curr_size

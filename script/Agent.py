@@ -12,7 +12,8 @@ STATUS_COMPLETE = 4
 
 
 
-
+class DuplicateAgentError(Exception):
+    pass
 
 class MethodUnimplementedException(Exception):
     """Exception to indicate that an unimplemented method has been called"""
@@ -100,11 +101,35 @@ class Agent:
         raise MethodUnimplementedException('Agent.dissolve has not yet been implemented.')
 
 
-class AgentFactory():
-    pass
+class AgentFactory:
+    """Factory object for Agent objects"""
+    def agent(self, url, fp):
+        return Agent(url, fp) # Yeah, it's superfluous right now, but I get the feeling this will be useful later.
+
 
 class CaseOfficer:
     """Class for managing multiple Agent instances. Spawns them as necessary, stops them if asked, and checks on their progress."""
-    def __init__(self, args: List):
-        self.Agents = []
-        self.AgentFactory = None
+    def __init__(self):
+        self.active_agents = []
+        self.sleeper_agents = []
+        self.args = {}
+        self.agent_factory = AgentFactory()
+
+    def assign_agents(self, args):
+        """Create Agent object for each argument pair, and return them as a list"""
+        for arg in args:
+             self.assign_agent(arg)
+
+    def assign_agent(self, arg):
+        url = arg['url']
+        fp = arg['fp']
+        if self.agent_assigned(url, fp):
+            raise DuplicateAgentError(
+                'An agent has already been assigned to this argument pair\nu: %s - fp: %s' % (url, fp)
+            )
+        return self.agent_factory.agent(url, fp)
+
+    def agent_assigned(self, url, fp):
+        """Returns true if an agent already exists that is assigned to the passed argument pair"""
+        # TODO: Implement this
+        return False
