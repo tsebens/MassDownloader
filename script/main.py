@@ -9,10 +9,8 @@ def main():
     co = CaseOfficer()
     cf = CaseFactory(default_directory=r'C:\Users\tristan.sebens\Downloads\MD_2.0_test')
     co.add_cases([cf.case(url) for url in urls])
-    while co.active_cases():
+    while co.cases_active():
         co.administrate()
-        sleep(5)
-
 
 
 if __name__ == '__main__':
