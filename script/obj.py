@@ -6,20 +6,21 @@ from datetime import datetime, timedelta
 from queue import Empty
 from time import sleep
 from typing import List
-from urllib.error import URLError
 from urllib.request import urlretrieve, urlcleanup, urlopen
 
-from exceptions import MethodUnimplementedException, StatusError, DuplicateAgentError, FileWriteError, FileWriteWarning
+from conf import STATUS_STAGING, STATUS_ACTIVE, STATUS_COMATOSE, STATUS_DEAD, STATUS_COMPLETE, FILE_CREATION_TIMEOUT, \
+    MAX_ALLOWABLE_ERR_COUNT
+from exceptions import MethodUnimplementedException, StatusError, DuplicateAgentError, FileWriteError
 
-STATUS_STAGING = 1
-STATUS_ACTIVE = 2
-STATUS_COMATOSE = 3
-STATUS_DEAD = 4
-STATUS_COMPLETE = 5
 
-FILE_CREATION_TIMEOUT = 30 # Seconds the application will wait for a file to be created before throwing a FileWriteError
-MAX_ALLOWABLE_ERR_COUNT = 5 # Number of errors (of the same type) that can be thrown before a case is shelved
-
+def dl_file(case, q):
+    """Basic file download function. Attempts to download the given url to the given file path"""
+    try:
+        urlretrieve(case.url, case.fp)
+        urlcleanup()
+    except Exception as exc:
+        '''If an error get's raised, put it into the queue.'''
+        q.put(exc)
 
 
 class CaseRecord:
@@ -46,14 +47,25 @@ class CaseRecord:
         '''If no errors have been thrown, returns (None, 0)'''
         if len(self.errs) == 0:
             '''No errors have been thrown yet'''
+            return 0
+        max_num = -1
+        for err_type in self.errs:
+            if self.errs[err_type] > max_num:
+                max_num = self.errs[err_type]
+        return max_num
+
+    def max_err_type(self):
+        """Return the type of error that has been thrown the most, along with the number of times it has been thrown"""
+        '''If no errors have been thrown, returns (None, 0)'''
+        if len(self.errs) == 0:
+            '''No errors have been thrown yet'''
             return None, 0
         max_num = -1
-        err_type = None
         for err_type in self.errs:
             if self.errs[err_type] > max_num:
                 max_num = self.errs[err_type]
                 err_type = err_type
-        return err_type, max_num
+        return err_type
 
 
 class StatusReport:
@@ -84,6 +96,11 @@ class StatusReport:
         if self.status == STATUS_DEAD or self.err:
             return True
         return False
+
+    def is_done(self):
+        """If the download has been completed, then return true"""
+        if self.status == STATUS_COMPLETE:
+            return True
 
 
 class CaseFactory:
@@ -126,7 +143,7 @@ class Agent:
     """Class which is reponsible for the complete transfer of a specified file from server to local disk"""
     def __init__(self, case: Case, tz=None):
         self.case = case # The local path where the file will be stored.
-        self.status = STATUS_STAGING # IMPORTANT: Only the agent should alter it's own status
+        self.status = STATUS_STAGING  # IMPORTANT: Only the agent should alter it's own status
         self.p = None
         self.last_size = 0
         self.dead_checks = 0
@@ -147,13 +164,13 @@ class Agent:
         if status == STATUS_STAGING:
             raise StatusError("Agent is in active group but has STAGING status") # This shouldn't be possible
         if status == STATUS_ACTIVE:
-            pass # Nothing to do if the process is still active.
+            self.on_active() # Nothing to do if the process is still active.
         if status == STATUS_COMATOSE:
-            pass # Also nothing to do if the process appears comatose.
+            self.on_comatose() # Also nothing to do if the process appears comatose.
         if status == STATUS_DEAD:
-            self.dl_restart()
+            self.on_dead()
         if status == STATUS_COMPLETE:
-            pass # These if cases are mostly here just in case I think of something to put here in the future.
+            self.on_complete() # These if cases are mostly here just in case I think of something to put here in the future.
         '''Check for errors. Log any that appear'''
         err = self.get_err()
         if err is not None:
@@ -186,13 +203,13 @@ class Agent:
                 self.status = STATUS_COMPLETE
         return self.status
 
-    def wait_for_file_creation(self):
+    def wait_for_file_creation(self, timeout=FILE_CREATION_TIMEOUT):
         """Wait for the creation of the file, and returns when the file has been created. Throws an error on timeout"""
         start_time = self.now()
         while not isfile(self.case.fp):  # Wait for the file to get created, then register the agent as active
             sleep(0.2)
             time_passed = self.now() - start_time
-            if time_passed.seconds > FILE_CREATION_TIMEOUT:
+            if time_passed.seconds > timeout:
                 raise FileWriteError('Timeout: File still hasn\'t been created.')
 
     def curr_dl_run_time(self):
@@ -226,40 +243,34 @@ class Agent:
             '''This exception means that the queue is empty'''
             return None
 
-    def dl_file(self):
-        """Basic file download function. Attempts to download the given url to the given file path"""
-        try:
-            urlretrieve(self.case.url, self.case.fp)
-            urlcleanup()
-        except Exception as exc:
-            '''If an error get's raised, put it into the queue.'''
-            self.q.put(exc)
-
     def dl_start(self):
         """Spawns a process which will download the file to disk, and returns a reference to that process"""
-        p = Process(target=self.dl_file)
+        p = Process(target=dl_file, args=(self.case, self.q))
         p.start()
+        dl_file(self.case, self.q)
         self.most_recent_start_time = self.now()
         self.wait_for_file_creation()
         self.status = STATUS_ACTIVE
         self.p = p
 
     def dl_kill(self):
-        """Terminate process. Will throw NoneType Error if the process has not been started. Deletes downloaded file"""
+        """Terminate process. Will throw NoneType Error if the process has not been started."""
         self.p.terminate()
         self.p.join()
-        # Delete the file. Stopping the process means that the download was interrupted.
-        # We can't retrieve it, and the file is incomplete. Keeping the file on disk would be misleading.
+
+    def dl_cleanup(self):
+        """Deletes the file."""
         remove(self.case.fp)
 
     def dl_restart(self):
         """Kills the current process, and begins a new download process."""
         self.dl_kill()
+        self.dl_cleanup()
         self.dl_start()
 
     def dl_complete(self):
         """Returns true if the file on disk is the same size as it's counterpart on the server"""
-        size_on_server = self.size_on_server()
+        size_on_server = self.get_size_on_server()
         size_on_disk = self.get_size_on_disk()
         if size_on_disk >= size_on_server:
             return True
@@ -294,12 +305,6 @@ class Agent:
         """Returns true if the size of the file on disk matches the size of the file on server"""
         if self.dl_complete():
             return True
-        if self.dl_looks_dead():
-            self.dead_checks += 1
-        if self.dead_checks > self.DEAD_CHECK_THRESHOLD:
-            self.dl_restart()
-            self.dead_checks = 0
-            self.restarts += 1
         return False
 
     def dissolve(self):
@@ -308,7 +313,27 @@ class Agent:
 
     def now(self):
         """Return a datetime object of the current moment."""
-        return datetime.now(tz=self.tz)
+        #TODO: This should be timezone sensitive. Just because
+        return datetime.now()
+
+
+    '''
+    Placeholder methods. One gets called every time the case is administrated. Which one depends
+    on the download status
+    '''
+    def on_active(self):
+        pass
+
+    def on_comatose(self):
+        pass
+
+    def on_dead(self):
+        self.dl_restart()
+        self.dead_checks = 0
+        self.restarts += 1
+
+    def on_complete(self):
+        pass
 
 
 class CaseOfficer:
@@ -316,18 +341,22 @@ class CaseOfficer:
     def __init__(self, max_active_agents=1):
         self.active_agents = []
         self.sleeper_agents = []
-        self.retired_agents = []
+        self.closed_cases = []
         self.cold_cases = []
         self.max_active_agents = max_active_agents
         self.agent_factory = AgentFactory()
 
-    def add_cases(self, cases: List(Case)):
+    def add_cases(self, cases: List):
         """Accept a list of args, and then register a list of Agents to this CaseOfficer, one for each argument pair"""
         self.register_agents(self.assign_agents(cases))
 
     def ice_case(self, case: Case):
         """Store a case that has proven too problematic"""
         self.cold_cases.append(case)
+
+    def close_case(self, case: Case):
+        """Case complete."""
+        self.closed_cases.append(case)
 
     def cases_active(self):
         """Returns true if there are still open Cases"""
@@ -351,14 +380,20 @@ class CaseOfficer:
         """Decide what to do with an Agent and its Case based on the StatusReport"""
         if self.case_should_be_iced(agent, report):
             self.ice_case(self.kill_agent(agent))
+        if self.case_should_be_closed(agent, report):
+            self.close_case(self.kill_agent(agent))
 
-    def case_should_be_shelved(self, agent, report):
+    def case_should_be_closed(self, agent: Agent, report:StatusReport):
+        """Return true if the download has finished and the case should be closed."""
+        return report.is_done()
+
+    def case_should_be_shelved(self, agent: Agent, report:StatusReport):
         """Return true if the case should be shelved for later"""
         # TODO: Implement this.
         # Case should be shelved if the case is getting a lot of 'connection forcibly closed' errors
         return False
 
-    def case_should_be_iced(self, agent, report):
+    def case_should_be_iced(self, agent: Agent, report:StatusReport):
         """Return true if, based on the Agent and the Case, the Case should be shelved"""
         record = agent.case.record
         if record.max_err_count() > MAX_ALLOWABLE_ERR_COUNT:
@@ -393,14 +428,14 @@ class CaseOfficer:
 
     def all_agents(self):
         """Returns all Agents registered to this CaseOfficer"""
-        return self.sleeper_agents + self.active_agents + self.retired_agents
+        return self.sleeper_agents + self.active_agents
 
     def activate_agent(self, agent: Agent):
         """Begins the download assigned to the passed Agent"""
         self.active_agents.append(agent)
         agent.dl_start()
 
-    def activate_agents(self, agents: List(Agent)):
+    def activate_agents(self, agents: List):
         """Activates all passed Agents"""
         for agent in agents:
             self.activate_agent(agent)
@@ -419,15 +454,11 @@ class CaseOfficer:
         del agent
         return case
 
-    def kill_agents(self, agents: List(Agent)):
+    def kill_agents(self, agents: List):
         """Deactivate a list of agents"""
         for agent in agents:
             yield self.kill_agent(agent)
 
-    def retire_agent(self, agent: Agent):
-        """Mark a download case as closed. The file has been retrieved, checked, and validated."""
-        self.active_agents.remove(agent)
-        self.retired_agents.append(agent)
 
 
 
