@@ -1,5 +1,6 @@
 from time import sleep
-from obj import CaseOfficer, CaseFactory
+from co import CaseOfficer
+from case import CaseFactory
 
 
 def main():
