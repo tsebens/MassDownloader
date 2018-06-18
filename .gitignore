@@ -3,3 +3,4 @@
 .idea/libraries/R_User_Library.xml
 .idea/MassDownloader.iml
 .idea/workspace.xml
+script/__pycache__/
